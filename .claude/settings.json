@@ -3,7 +3,11 @@
     "allow": [
       "Bash(cat)",
       "Bash(chmod +x /tmp/build_ros_msg.sh)",
-      "Bash(chmod +x /home/yozakur4/unitree_RL/unitree_rl_mjlab/scripts/velocity_commander.py)"
+      "Bash(chmod +x /home/yozakur4/unitree_RL/unitree_rl_mjlab/scripts/velocity_commander.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add interface specification and valid files documentation *)",
+      "Bash(git commit -m 'Add ROS1/ROS2 bridge compatibility analysis *)",
+      "Bash(chmod +x /home/yozakur4/unitree_RL/unitree_rl_mjlab/scripts/rl_policy_lowlevel_node_ros2.py)"
     ]
   }
 }
