@@ -1,0 +1,34 @@
+<!-- rl_policy_lowlevel.launch -->
+<launch>
+  <!-- RL Policy 参数 -->
+  <arg name="checkpoint_path" default="$(env HOME)/unitree_RL/model_10000.pt" />
+  <arg name="device" default="cuda:0" />
+  <arg name="control_rate" default="50" />
+  <arg name="use_simulation" default="true" />
+
+  <!-- PD 参数 -->
+  <arg name="Kp" default="50.0" />
+  <arg name="Kd" default="1.0" />
+
+  <!-- ROS 话题名称 -->
+  <arg name="cmd_vel_topic" default="/cmd_vel" />
+  <arg name="imu_topic" default="/trunk_imu" />
+  <arg name="joint_states_topic" default="/joint_states" />
+  <arg name="lowcmd_topic" default="/lowcmd" />
+
+  <!-- 启动 RL Policy Node -->
+  <node name="rl_policy_lowlevel" pkg="unitree_rl_control" type="rl_policy_lowlevel_node.py" output="screen">
+    <param name="checkpoint_path" value="$(arg checkpoint_path)" />
+    <param name="device" value="$(arg device)" />
+    <param name="control_rate" value="$(arg control_rate)" />
+    <param name="use_simulation" value="$(arg use_simulation)" />
+    <param name="Kp" value="$(arg Kp)" />
+    <param name="Kd" value="$(arg Kd)" />
+
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)" />
+    <param name="imu_topic" value="$(arg imu_topic)" />
+    <param name="joint_states_topic" value="$(arg joint_states_topic)" />
+    <param name="lowcmd_topic" value="$(arg lowcmd_topic)" />
+  </node>
+
+</launch>

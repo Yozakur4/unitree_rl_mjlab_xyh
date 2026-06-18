@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/build_ros_msg.sh)",
+      "Bash(chmod +x /home/yozakur4/unitree_RL/unitree_rl_mjlab/scripts/velocity_commander.py)"
+    ]
+  }
+}
