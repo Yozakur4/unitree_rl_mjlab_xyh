@@ -210,22 +210,33 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   twist_cmd.heading_command = False
   twist_cmd.rel_heading_envs = 0.0
   twist_cmd.ranges.heading = None
-  twist_cmd.resampling_time_range = (1.5, 4.0)
-  twist_cmd.rel_standing_envs = 0.25
-  twist_cmd.rel_straight_envs = 0.55
-  twist_cmd.straight_lin_vel_x = (0.03, 0.9)
+  twist_cmd.resampling_time_range = (2.0, 5.0)
+  twist_cmd.rel_standing_envs = 0.15
+  twist_cmd.rel_straight_envs = 0.45
+  twist_cmd.straight_lin_vel_x = (0.12, 0.7)
   twist_cmd.command_deadband = 0.0
-  twist_cmd.init_velocity_prob = 0.20
-  twist_cmd.ranges.lin_vel_x = (-0.2, 1.0)
-  twist_cmd.ranges.lin_vel_y = (-0.25, 0.25)
-  twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+  twist_cmd.init_velocity_prob = 0.10
+  twist_cmd.ranges.lin_vel_x = (0.0, 0.8)
+  twist_cmd.ranges.lin_vel_y = (-0.15, 0.15)
+  twist_cmd.ranges.ang_vel_z = (-0.3, 0.3)
 
-  cfg.rewards["track_linear_velocity"].weight = 1.5
-  cfg.rewards["track_linear_velocity"].params["std"] = 0.35
-  cfg.rewards["track_angular_velocity"].weight = 1.5
-  cfg.rewards["track_angular_velocity"].params["std"] = 0.45
-  cfg.rewards["body_orientation_l2"].weight = -1.5
-  cfg.rewards["stand_still"].weight = -2.0
+  cfg.rewards["track_linear_velocity"].weight = 1.0
+  cfg.rewards["track_linear_velocity"].params["std"] = 0.5
+  cfg.rewards["track_angular_velocity"].weight = 1.0
+  cfg.rewards["track_angular_velocity"].params["std"] = 0.5
+  cfg.rewards["body_orientation_l2"].weight = -1.0
+  cfg.rewards["stand_still"].weight = -0.8
+
+  # Keep the fine-tune from washing out the pretrained arm swing. The base
+  # G1-23DOF config keeps arm joints close to their nominal pose, which is fine
+  # for generic walking but too restrictive when adding stop/straight rewards.
+  for pose_std_name in ("std_walking", "std_running"):
+    pose_std = cfg.rewards["pose"].params[pose_std_name]
+    pose_std[r".*shoulder_pitch.*"] = 0.45
+    pose_std[r".*shoulder_roll.*"] = 0.35
+    pose_std[r".*shoulder_yaw.*"] = 0.35
+    pose_std[r".*elbow.*"] = 0.35
+    pose_std[r".*wrist.*"] = 0.35
 
   for name in ("foot_gait", "foot_clearance", "foot_slip", "soft_landing"):
     if name in cfg.rewards:
@@ -233,7 +244,7 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
 
   cfg.rewards["straight_lateral_velocity_l2"] = RewardTermCfg(
     func=mdp.straight_lateral_velocity_l2,
-    weight=-2.0,
+    weight=-1.0,
     params={
       "command_name": "twist",
       "min_x_speed": 0.05,
@@ -243,7 +254,7 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   )
   cfg.rewards["straight_yaw_velocity_l2"] = RewardTermCfg(
     func=mdp.straight_yaw_velocity_l2,
-    weight=-1.5,
+    weight=-0.8,
     params={
       "command_name": "twist",
       "min_x_speed": 0.05,
@@ -253,7 +264,7 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   )
   cfg.rewards["stop_base_velocity_l2"] = RewardTermCfg(
     func=mdp.stop_base_velocity_l2,
-    weight=-3.0,
+    weight=-1.0,
     params={
       "command_name": "twist",
       "command_threshold": 0.05,
@@ -265,21 +276,21 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
     cfg.curriculum["command_vel"].params["velocity_stages"] = [
       {
         "step": 0,
-        "lin_vel_x": (0.0, 0.5),
+        "lin_vel_x": (0.0, 0.45),
         "lin_vel_y": (-0.05, 0.05),
         "ang_vel_z": (-0.15, 0.15),
       },
       {
         "step": 5000 * 24,
-        "lin_vel_x": (-0.1, 0.8),
-        "lin_vel_y": (-0.15, 0.15),
-        "ang_vel_z": (-0.3, 0.3),
+        "lin_vel_x": (0.0, 0.7),
+        "lin_vel_y": (-0.1, 0.1),
+        "ang_vel_z": (-0.25, 0.25),
       },
       {
         "step": 15000 * 24,
-        "lin_vel_x": (-0.2, 1.0),
-        "lin_vel_y": (-0.25, 0.25),
-        "ang_vel_z": (-0.5, 0.5),
+        "lin_vel_x": (0.0, 0.8),
+        "lin_vel_y": (-0.15, 0.15),
+        "ang_vel_z": (-0.3, 0.3),
       },
     ]
 

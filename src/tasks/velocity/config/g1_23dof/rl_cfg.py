@@ -51,5 +51,9 @@ def unitree_g1_23dof_straight_stop_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg = unitree_g1_23dof_ppo_runner_cfg()
   cfg.experiment_name = "g1_23dof_straight_stop"
   cfg.run_name = "straight_stop"
-  cfg.save_interval = 50
+  cfg.save_interval = 100
+  cfg.max_iterations = 8000
+  cfg.algorithm.learning_rate = 2.0e-4
+  cfg.algorithm.desired_kl = 0.006
+  cfg.algorithm.entropy_coef = 0.005
   return cfg
