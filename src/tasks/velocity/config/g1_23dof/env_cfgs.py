@@ -10,8 +10,8 @@ from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
-from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+import src.tasks.velocity.mdp as mdp
 from src.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
@@ -191,5 +191,103 @@ def unitree_g1_23dof_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     twist_cmd.ranges.lin_vel_x = (-0.5, 1.0)
     twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
     twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+
+  return cfg
+
+
+def unitree_g1_23dof_flat_straight_stop_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create a flat-terrain config biased toward straight walking and stopping.
+
+  This keeps the same observation/action space as ``Unitree-G1-23Dof-Flat`` so
+  existing velocity checkpoints can be fine-tuned on it.
+  """
+  cfg = unitree_g1_23dof_flat_env_cfg(play=play)
+
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.heading_command = False
+  twist_cmd.rel_heading_envs = 0.0
+  twist_cmd.ranges.heading = None
+  twist_cmd.resampling_time_range = (1.5, 4.0)
+  twist_cmd.rel_standing_envs = 0.25
+  twist_cmd.rel_straight_envs = 0.55
+  twist_cmd.straight_lin_vel_x = (0.03, 0.9)
+  twist_cmd.command_deadband = 0.0
+  twist_cmd.init_velocity_prob = 0.20
+  twist_cmd.ranges.lin_vel_x = (-0.2, 1.0)
+  twist_cmd.ranges.lin_vel_y = (-0.25, 0.25)
+  twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+
+  cfg.rewards["track_linear_velocity"].weight = 1.5
+  cfg.rewards["track_linear_velocity"].params["std"] = 0.35
+  cfg.rewards["track_angular_velocity"].weight = 1.5
+  cfg.rewards["track_angular_velocity"].params["std"] = 0.45
+  cfg.rewards["body_orientation_l2"].weight = -1.5
+  cfg.rewards["stand_still"].weight = -2.0
+
+  for name in ("foot_gait", "foot_clearance", "foot_slip", "soft_landing"):
+    if name in cfg.rewards:
+      cfg.rewards[name].params["command_threshold"] = 0.03
+
+  cfg.rewards["straight_lateral_velocity_l2"] = RewardTermCfg(
+    func=mdp.straight_lateral_velocity_l2,
+    weight=-2.0,
+    params={
+      "command_name": "twist",
+      "min_x_speed": 0.05,
+      "max_abs_y_speed": 0.02,
+      "max_abs_yaw_rate": 0.02,
+    },
+  )
+  cfg.rewards["straight_yaw_velocity_l2"] = RewardTermCfg(
+    func=mdp.straight_yaw_velocity_l2,
+    weight=-1.5,
+    params={
+      "command_name": "twist",
+      "min_x_speed": 0.05,
+      "max_abs_y_speed": 0.02,
+      "max_abs_yaw_rate": 0.02,
+    },
+  )
+  cfg.rewards["stop_base_velocity_l2"] = RewardTermCfg(
+    func=mdp.stop_base_velocity_l2,
+    weight=-3.0,
+    params={
+      "command_name": "twist",
+      "command_threshold": 0.05,
+      "yaw_weight": 0.5,
+    },
+  )
+
+  if "command_vel" in cfg.curriculum:
+    cfg.curriculum["command_vel"].params["velocity_stages"] = [
+      {
+        "step": 0,
+        "lin_vel_x": (0.0, 0.5),
+        "lin_vel_y": (-0.05, 0.05),
+        "ang_vel_z": (-0.15, 0.15),
+      },
+      {
+        "step": 5000 * 24,
+        "lin_vel_x": (-0.1, 0.8),
+        "lin_vel_y": (-0.15, 0.15),
+        "ang_vel_z": (-0.3, 0.3),
+      },
+      {
+        "step": 15000 * 24,
+        "lin_vel_x": (-0.2, 1.0),
+        "lin_vel_y": (-0.25, 0.25),
+        "ang_vel_z": (-0.5, 0.5),
+      },
+    ]
+
+  if play:
+    twist_cmd.rel_standing_envs = 0.0
+    twist_cmd.rel_straight_envs = 1.0
+    twist_cmd.ranges.lin_vel_x = (0.0, 0.8)
+    twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
+    twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
 
   return cfg

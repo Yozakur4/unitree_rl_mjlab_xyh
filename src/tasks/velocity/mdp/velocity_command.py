@@ -41,6 +41,7 @@ class UniformVelocityCommand(CommandTerm):
     self.is_heading_env = torch.zeros(
       self.num_envs, dtype=torch.bool, device=self.device
     )
+    self.is_straight_env = torch.zeros_like(self.is_heading_env)
     self.is_standing_env = torch.zeros_like(self.is_heading_env)
 
     self.metrics["error_vel_xy"] = torch.zeros(self.num_envs, device=self.device)
@@ -74,12 +75,32 @@ class UniformVelocityCommand(CommandTerm):
     self.vel_command_b[env_ids, 0] = r.uniform_(*self.cfg.ranges.lin_vel_x)
     self.vel_command_b[env_ids, 1] = r.uniform_(*self.cfg.ranges.lin_vel_y)
     self.vel_command_b[env_ids, 2] = r.uniform_(*self.cfg.ranges.ang_vel_z)
-    self.vel_command_b[env_ids, :] *= (torch.norm(self.vel_command_b[env_ids, :], dim=1) > 0.1).unsqueeze(1)
+    if self.cfg.command_deadband > 0.0:
+      self.vel_command_b[env_ids, :] *= (
+        torch.norm(self.vel_command_b[env_ids, :], dim=1) > self.cfg.command_deadband
+      ).unsqueeze(1)
     if self.cfg.heading_command:
       assert self.cfg.ranges.heading is not None
       self.heading_target[env_ids] = r.uniform_(*self.cfg.ranges.heading)
       self.is_heading_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_heading_envs
+    else:
+      self.is_heading_env[env_ids] = False
     self.is_standing_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_standing_envs
+
+    straight_mask = (
+      r.uniform_(0.0, 1.0) <= self.cfg.rel_straight_envs
+    ) & ~self.is_standing_env[env_ids]
+    straight_env_ids = env_ids[straight_mask]
+    self.is_straight_env[env_ids] = False
+    if len(straight_env_ids) > 0:
+      x_range = self.cfg.straight_lin_vel_x or self.cfg.ranges.lin_vel_x
+      self.vel_command_b[straight_env_ids, 0] = torch.empty(
+        len(straight_env_ids), device=self.device
+      ).uniform_(*x_range)
+      self.vel_command_b[straight_env_ids, 1] = 0.0
+      self.vel_command_b[straight_env_ids, 2] = 0.0
+      self.is_straight_env[straight_env_ids] = True
+      self.is_heading_env[straight_env_ids] = False
 
     init_vel_mask = r.uniform_(0.0, 1.0) < self.cfg.init_velocity_prob
     init_vel_env_ids = env_ids[init_vel_mask]
@@ -253,7 +274,10 @@ class UniformVelocityCommandCfg(CommandTermCfg):
   heading_control_stiffness: float = 1.0
   rel_standing_envs: float = 0.0
   rel_heading_envs: float = 1.0
+  rel_straight_envs: float = 0.0
   init_velocity_prob: float = 0.0
+  straight_lin_vel_x: tuple[float, float] | None = None
+  command_deadband: float = 0.1
 
   @dataclass
   class Ranges:

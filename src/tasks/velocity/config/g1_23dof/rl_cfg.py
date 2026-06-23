@@ -44,3 +44,12 @@ def unitree_g1_23dof_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     num_steps_per_env=24,
     max_iterations=10001,
   )
+
+
+def unitree_g1_23dof_straight_stop_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Create RL runner config for straight-walk and stop fine-tuning."""
+  cfg = unitree_g1_23dof_ppo_runner_cfg()
+  cfg.experiment_name = "g1_23dof_straight_stop"
+  cfg.run_name = "straight_stop"
+  cfg.save_interval = 50
+  return cfg

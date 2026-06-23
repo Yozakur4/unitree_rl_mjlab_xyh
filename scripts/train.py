@@ -10,6 +10,10 @@ from typing import Literal, cast
 
 import tyro
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+  sys.path.insert(0, str(PROJECT_ROOT))
+
 from mjlab.envs import ManagerBasedRlEnv, ManagerBasedRlEnvCfg
 from mjlab.rl import MjlabOnPolicyRunner, RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
@@ -24,6 +28,7 @@ from mjlab.utils.wrappers import VideoRecorder
 class TrainConfig:
   env: ManagerBasedRlEnvCfg
   agent: RslRlBaseRunnerCfg
+  checkpoint_file: str | None = None
   motion_file: str | None = None
   video: bool = False
   video_length: int = 200
@@ -96,11 +101,15 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
   log_root_path = log_dir.parent  # Go up from specific run dir to experiment dir.
 
   resume_path: Path | None = None
-  if cfg.agent.resume:
-      # Load checkpoint from local filesystem.
-      resume_path = get_checkpoint_path(
-        log_root_path, cfg.agent.load_run, cfg.agent.load_checkpoint
-      )
+  if cfg.checkpoint_file is not None:
+    resume_path = Path(cfg.checkpoint_file).expanduser().resolve()
+    if not resume_path.exists():
+      raise FileNotFoundError(f"Checkpoint file not found: {resume_path}")
+  elif cfg.agent.resume:
+    # Load checkpoint from local filesystem.
+    resume_path = get_checkpoint_path(
+      log_root_path, cfg.agent.load_run, cfg.agent.load_checkpoint
+    )
 
   # Only record videos on rank 0 to avoid multiple workers writing to the same files.
   if cfg.video and rank == 0:

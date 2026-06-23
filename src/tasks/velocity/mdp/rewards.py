@@ -60,6 +60,75 @@ def track_angular_velocity(
   return torch.exp(-ang_vel_error / std**2)
 
 
+def _straight_command_mask(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  min_x_speed: float,
+  max_abs_y_speed: float,
+  max_abs_yaw_rate: float,
+) -> torch.Tensor:
+  command = env.command_manager.get_command(command_name)
+  assert command is not None, f"Command '{command_name}' not found."
+  return (
+    (torch.abs(command[:, 0]) >= min_x_speed)
+    & (torch.abs(command[:, 1]) <= max_abs_y_speed)
+    & (torch.abs(command[:, 2]) <= max_abs_yaw_rate)
+  ).float()
+
+
+def straight_lateral_velocity_l2(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  min_x_speed: float = 0.05,
+  max_abs_y_speed: float = 0.02,
+  max_abs_yaw_rate: float = 0.02,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize lateral base velocity when the command is straight walking."""
+  asset: Entity = env.scene[asset_cfg.name]
+  active = _straight_command_mask(
+    env, command_name, min_x_speed, max_abs_y_speed, max_abs_yaw_rate
+  )
+  lateral_vel = asset.data.root_link_lin_vel_b[:, 1]
+  return torch.square(lateral_vel) * active
+
+
+def straight_yaw_velocity_l2(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  min_x_speed: float = 0.05,
+  max_abs_y_speed: float = 0.02,
+  max_abs_yaw_rate: float = 0.02,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize yaw drift when the command is straight walking."""
+  asset: Entity = env.scene[asset_cfg.name]
+  active = _straight_command_mask(
+    env, command_name, min_x_speed, max_abs_y_speed, max_abs_yaw_rate
+  )
+  yaw_vel = asset.data.root_link_ang_vel_b[:, 2]
+  return torch.square(yaw_vel) * active
+
+
+def stop_base_velocity_l2(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  command_threshold: float = 0.05,
+  yaw_weight: float = 0.5,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize residual base motion when the commanded velocity is near zero."""
+  asset: Entity = env.scene[asset_cfg.name]
+  command = env.command_manager.get_command(command_name)
+  assert command is not None, f"Command '{command_name}' not found."
+  linear_norm = torch.norm(command[:, :2], dim=1)
+  yaw_norm = torch.abs(command[:, 2])
+  active = ((linear_norm + yaw_norm) <= command_threshold).float()
+  lin_xy = torch.sum(torch.square(asset.data.root_link_lin_vel_b[:, :2]), dim=1)
+  yaw = torch.square(asset.data.root_link_ang_vel_b[:, 2])
+  return (lin_xy + yaw_weight * yaw) * active
+
+
 def body_orientation_l2(
   env: ManagerBasedRlEnv,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
@@ -425,4 +494,3 @@ def stand_still(
             scale = (total_command <= command_threshold).float()
             reward *= scale
     return reward
-
