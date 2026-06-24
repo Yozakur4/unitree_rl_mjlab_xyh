@@ -7,6 +7,7 @@ from src.assets.robots import (
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
@@ -212,11 +213,11 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   twist_cmd.ranges.heading = None
   twist_cmd.resampling_time_range = (2.0, 5.0)
   twist_cmd.rel_standing_envs = 0.15
-  twist_cmd.rel_straight_envs = 0.45
-  twist_cmd.straight_lin_vel_x = (0.12, 0.7)
+  twist_cmd.rel_straight_envs = 0.60
+  twist_cmd.straight_lin_vel_x = (0.12, 1.2)
   twist_cmd.command_deadband = 0.0
   twist_cmd.init_velocity_prob = 0.10
-  twist_cmd.ranges.lin_vel_x = (0.0, 0.8)
+  twist_cmd.ranges.lin_vel_x = (0.0, 1.2)
   twist_cmd.ranges.lin_vel_y = (-0.15, 0.15)
   twist_cmd.ranges.ang_vel_z = (-0.3, 0.3)
 
@@ -225,7 +226,7 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   cfg.rewards["track_angular_velocity"].weight = 1.0
   cfg.rewards["track_angular_velocity"].params["std"] = 0.5
   cfg.rewards["body_orientation_l2"].weight = -1.0
-  cfg.rewards["stand_still"].weight = -0.8
+  cfg.rewards["stand_still"].weight = -0.3
 
   # Keep the fine-tune from washing out the pretrained arm swing. The base
   # G1-23DOF config keeps arm joints close to their nominal pose, which is fine
@@ -264,7 +265,7 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
   )
   cfg.rewards["stop_base_velocity_l2"] = RewardTermCfg(
     func=mdp.stop_base_velocity_l2,
-    weight=-1.0,
+    weight=-0.3,
     params={
       "command_name": "twist",
       "command_threshold": 0.05,
@@ -281,23 +282,45 @@ def unitree_g1_23dof_flat_straight_stop_env_cfg(
         "ang_vel_z": (-0.15, 0.15),
       },
       {
-        "step": 5000 * 24,
+        "step": 1000 * 24,
         "lin_vel_x": (0.0, 0.7),
         "lin_vel_y": (-0.1, 0.1),
         "ang_vel_z": (-0.25, 0.25),
       },
       {
-        "step": 15000 * 24,
-        "lin_vel_x": (0.0, 0.8),
+        "step": 3500 * 24,
+        "lin_vel_x": (0.0, 1.2),
         "lin_vel_y": (-0.15, 0.15),
         "ang_vel_z": (-0.3, 0.3),
       },
     ]
+    cfg.curriculum["stand_still_weight"] = CurriculumTermCfg(
+      func=mdp.reward_weight,
+      params={
+        "reward_name": "stand_still",
+        "weight_stages": [
+          {"step": 0, "weight": -0.3},
+          {"step": 1000 * 24, "weight": -0.6},
+          {"step": 3500 * 24, "weight": -1.0},
+        ],
+      },
+    )
+    cfg.curriculum["stop_base_velocity_l2_weight"] = CurriculumTermCfg(
+      func=mdp.reward_weight,
+      params={
+        "reward_name": "stop_base_velocity_l2",
+        "weight_stages": [
+          {"step": 0, "weight": -0.3},
+          {"step": 1000 * 24, "weight": -0.6},
+          {"step": 3500 * 24, "weight": -1.0},
+        ],
+      },
+    )
 
   if play:
     twist_cmd.rel_standing_envs = 0.0
     twist_cmd.rel_straight_envs = 1.0
-    twist_cmd.ranges.lin_vel_x = (0.0, 0.8)
+    twist_cmd.ranges.lin_vel_x = (0.0, 1.2)
     twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
     twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
 
