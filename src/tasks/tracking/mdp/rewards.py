@@ -4,13 +4,18 @@ from typing import TYPE_CHECKING, cast
 
 import torch
 
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactSensor
-from mjlab.utils.lab_api.math import quat_error_magnitude
+from mjlab.utils.lab_api.math import quat_apply_inverse, quat_error_magnitude
 
 from .commands import MotionCommand
 
 if TYPE_CHECKING:
+  from mjlab.entity import Entity
   from mjlab.envs import ManagerBasedRlEnv
+
+
+_DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 
 
 def _get_body_indexes(
@@ -111,6 +116,19 @@ def motion_global_body_angular_velocity_error_exp(
     dim=-1,
   )
   return torch.exp(-error.mean(-1) / std**2)
+
+
+def body_orientation_l2(
+  env: ManagerBasedRlEnv,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize non-upright body orientation via projected gravity XY error."""
+  asset: Entity = env.scene[asset_cfg.name]
+  if asset_cfg.body_ids:
+    body_quat_w = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :].squeeze(1)
+    projected_gravity_b = quat_apply_inverse(body_quat_w, asset.data.gravity_vec_w)
+    return torch.sum(torch.square(projected_gravity_b[:, :2]), dim=1)
+  return torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
 
 
 def self_collision_cost(
