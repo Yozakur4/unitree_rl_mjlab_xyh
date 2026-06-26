@@ -44,3 +44,10 @@ def unitree_g1_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     num_steps_per_env=24,
     max_iterations=10001,
   )
+
+
+def unitree_g1_autonomous_phase_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Create RL runner configuration for the autonomous-compatible G1 task."""
+  cfg = unitree_g1_ppo_runner_cfg()
+  cfg.experiment_name = "g1_autonomous_phase_velocity"
+  return cfg

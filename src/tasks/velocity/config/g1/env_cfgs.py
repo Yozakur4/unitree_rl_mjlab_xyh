@@ -4,12 +4,15 @@ from src.assets.robots import (
   G1_ACTION_SCALE,
   get_g1_robot_cfg,
 )
+from src.assets.robots.unitree_g1.g1_constants import KNEES_BENT_KEYFRAME
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.event_manager import EventTermCfg
+from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg, RayCastSensorCfg
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from src.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
@@ -195,5 +198,34 @@ def unitree_g1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     twist_cmd.ranges.lin_vel_x = (-0.5, 1.0)
     twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
     twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+
+  return cfg
+
+
+def unitree_g1_autonomous_phase_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create G1 flat config matching autonomous 29-DoF walker + phase obs."""
+  cfg = unitree_g1_flat_env_cfg(play=play)
+
+  robot = cfg.scene.entities["robot"]
+  robot.init_state = KNEES_BENT_KEYFRAME
+
+  actor_terms = cfg.observations["actor"].terms
+  actor_terms["base_lin_vel"] = ObservationTermCfg(
+    func=mdp.builtin_sensor,
+    params={"sensor_name": "robot/imu_lin_vel"},
+    noise=Unoise(n_min=-0.5, n_max=0.5),
+  )
+  cfg.observations["actor"].terms = {
+    "base_lin_vel": actor_terms["base_lin_vel"],
+    "base_ang_vel": actor_terms["base_ang_vel"],
+    "projected_gravity": actor_terms["projected_gravity"],
+    "joint_pos": actor_terms["joint_pos"],
+    "joint_vel": actor_terms["joint_vel"],
+    "actions": actor_terms["actions"],
+    "command": actor_terms["command"],
+    "phase": actor_terms["phase"],
+  }
 
   return cfg
